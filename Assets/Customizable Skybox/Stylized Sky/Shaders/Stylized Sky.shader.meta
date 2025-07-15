@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: eb3c6fb598ded4c71b8968e1c40a3b4d
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 174576
+  packageName: Customizable skybox
+  packageVersion: 1.0
+  assetPath: Assets/Customizable Skybox/Stylized Sky/Shaders/Stylized Sky.shader
+  uploadId: 378796

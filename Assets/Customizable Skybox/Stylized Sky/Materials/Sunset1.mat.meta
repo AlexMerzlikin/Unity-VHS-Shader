@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 2441c79940171dc43b33badf9fe97828
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 174576
+  packageName: Customizable skybox
+  packageVersion: 1.0
+  assetPath: Assets/Customizable Skybox/Stylized Sky/Materials/Sunset1.mat
+  uploadId: 378796
