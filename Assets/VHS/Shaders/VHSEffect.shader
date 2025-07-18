@@ -22,6 +22,10 @@ Shader "Custom/VHSEffect"
         _DashStreakWidth ("Dash Streak Width", Range(0,0.05)) = 0.008
         _DashStreakCount ("Dash Streak Count", Range(1,8)) = 1
         _DashCount ("Dash Count", Range(2,12)) = 7
+        _EnableStreaks ("Enable Streaks", Float) = 1
+        _EnableDashes ("Enable Dashes", Float) = 1
+        _DashStreakWidthMin ("Dash Streak Width Min", Range(0,0.05)) = 0.004
+        _DashStreakWidthMax ("Dash Streak Width Max", Range(0,0.05)) = 0.018
     }
     SubShader
     {
@@ -71,6 +75,10 @@ Shader "Custom/VHSEffect"
             float _DashStreakWidth;
             float _DashStreakCount;
             float _DashCount;
+            float _EnableStreaks;
+            float _EnableDashes;
+            float _DashStreakWidthMin;
+            float _DashStreakWidthMax;
 
             v2f vert(appdata v)
             {
@@ -118,62 +126,80 @@ Shader "Custom/VHSEffect"
                 float wobble = sin(uv.y * _WobbleFrequency + _TimeParam * _WobbleSpeed) * _Distortion * 0.02;
                 float2 distortedUV = uv + float2(wobble, 0);
                 col.rgb = lerp(col.rgb, tex2D(_MainTex, distortedUV).rgb, _Distortion);
+                float frameSeed = floor(_TimeParam * 60.0);
 
                 // 6. Improved Horizontal Glitch Streaks (multiple, short, rare full-width)
-                float3 streakColorSum = float3(0, 0, 0);
-                float streakShapeSum = 0.0;
-                int streaks = (int)_StreakCount;
-                float frameSeed = floor(_TimeParam * 60.0);
-                for (int s = 0; s < 8; s++)
+                if (_EnableStreaks > 0.5)
                 {
-                    if (s >= streaks) break;
-                    float streakSeed = frameSeed + s * 13.37;
-                    float yPos = frac(rand(float2(streakSeed, streakSeed * 1.37))) * 0.8 + 0.1;
-                    float xStart = rand(float2(streakSeed, 0.123)) * 0.8;
-                    float xLen = lerp(0.08, 0.5, rand(float2(streakSeed, 0.456)));
-                    float fullWidth = step(1.0 - _StreakFullWidthChance, rand(float2(streakSeed, 0.789)));
-                    xStart = lerp(xStart, 0.0, fullWidth);
-                    xLen = lerp(xLen, 1.0, fullWidth);
-                    float inX = step(xStart, uv.x) * step(uv.x, xStart + xLen);
-                    float streakCore = step(abs(uv.y - yPos), _StreakWidth * 0.3);
-                    float streakEdge = smoothstep(_StreakWidth, 0.0, abs(uv.y - yPos));
-                    float streakShape = max(streakCore, streakEdge * 0.7) * inX;
-                    float flicker = lerp(0.7, 1.0, rand(float2(_TimeParam * 10.0, streakSeed))) * (0.7 + 0.3 * sin(
-                        _TimeParam * 360.0 + streakSeed * 10.0));
-                    float streak = streakShape * flicker * _StreakIntensity;
-                    float3 thisStreakColor = _StreakColor.rgb * streak;
-                    streakColorSum += thisStreakColor;
-                    streakShapeSum = max(streakShapeSum, streakShape);
+                    float3 streakColorSum = float3(0, 0, 0);
+                    float streakShapeSum = 0.0;
+                    int streaks = (int)_StreakCount;
+                    for (int s = 0; s < 8; s++)
+                    {
+                        if (s >= streaks) break;
+                        float streakSeed = frameSeed + s * 13.37;
+                        float yPos = frac(rand(float2(streakSeed, streakSeed * 1.37))) * 0.8 + 0.1;
+                        float xStart = rand(float2(streakSeed, 0.123)) * 0.8;
+                        float xLen = lerp(0.08, 0.5, rand(float2(streakSeed, 0.456)));
+                        float fullWidth = step(1.0 - _StreakFullWidthChance, rand(float2(streakSeed, 0.789)));
+                        xStart = lerp(xStart, 0.0, fullWidth);
+                        xLen = lerp(xLen, 1.0, fullWidth);
+                        float inX = step(xStart, uv.x) * step(uv.x, xStart + xLen);
+                        float streakCore = step(abs(uv.y - yPos), _StreakWidth * 0.3);
+                        float streakEdge = smoothstep(_StreakWidth, 0.0, abs(uv.y - yPos));
+                        float streakShape = max(streakCore, streakEdge * 0.7) * inX;
+                        float flicker = lerp(0.7, 1.0, rand(float2(_TimeParam * 10.0, streakSeed))) * (0.7 + 0.3 * sin(
+                            _TimeParam * 360.0 + streakSeed * 10.0));
+                        float streak = streakShape * flicker * _StreakIntensity;
+                        float3 thisStreakColor = _StreakColor.rgb * streak;
+                        streakColorSum += thisStreakColor;
+                        streakShapeSum = max(streakShapeSum, streakShape);
+                    }
+                    float streakDistort = streakShapeSum * _StreakDistortion * (rand(float2(uv.y, _TimeParam)) - 0.5);
+                    float2 uvStreaked = uv + float2(streakDistort, 0);
+                    col.rgb = lerp(col.rgb, tex2D(_MainTex, uvStreaked).rgb, streakShapeSum * 0.5);
+                    col.rgb += streakColorSum;
                 }
 
-                float streakDistort = streakShapeSum * _StreakDistortion * (rand(float2(uv.y, _TimeParam)) - 0.5);
-                float2 uvStreaked = uv + float2(streakDistort, 0);
-                col.rgb = lerp(col.rgb, tex2D(_MainTex, uvStreaked).rgb, streakShapeSum * 0.5);
-                col.rgb += streakColorSum;
-
                 // 7. Segmented/Dashed Horizontal Streak (VHS dropout)
-                for (int dStreak = 0; dStreak < 4; dStreak++)
+                if (_EnableDashes > 0.5)
                 {
-                    if (dStreak >= (int)_DashStreakCount) break;
-                    float dashSeed = frameSeed + 100.0 + dStreak * 17.17;
-                    float dashY = frac(rand(float2(dashSeed, dashSeed * 1.37))) * 0.8 + 0.1;
-                    float dashCore = step(abs(uv.y - dashY), _DashStreakWidth * 0.5);
-                    float dashEdge = smoothstep(_DashStreakWidth, 0.0, abs(uv.y - dashY));
-                    float dashShape = max(dashCore, dashEdge * 0.7);
-                    float dashSum = 0.0;
-                    for (int seg = 0; seg < 12; seg++)
+                    for (int dStreak = 0; dStreak < 4; dStreak++)
                     {
-                        if (seg >= (int)_DashCount) break;
-                        float segSeed = dashSeed + seg * 23.23;
-                        float xStart = rand(float2(segSeed, 0.321));
-                        float xLen = lerp(0.02, 0.18, rand(float2(segSeed, 0.654)));
-                        float inDash = step(xStart, uv.x) * step(uv.x, xStart + xLen);
-                        dashSum += inDash;
+                        if (dStreak >= (int)_DashStreakCount) break;
+                        float dashSeed = frameSeed + 100.0 + dStreak * 17.17;
+                        float dashY = frac(rand(float2(dashSeed, dashSeed * 1.37))) * 0.8 + 0.1;
+                        float dashWidth = lerp(_DashStreakWidthMin, _DashStreakWidthMax, rand(float2(dashSeed, 0.555)));
+                        float dashCore = step(abs(uv.y - dashY), dashWidth * 0.5);
+                        float dashEdge = smoothstep(dashWidth, 0.0, abs(uv.y - dashY));
+                        float dashShape = max(dashCore, dashEdge * 0.7);
+                        for (int seg = 0; seg < 12; seg++)
+                        {
+                            if (seg >= (int)_DashCount) break;
+                            float segSeed = dashSeed + seg * 23.23;
+                            float xStart = rand(float2(segSeed, 0.321));
+                            float xLen = lerp(0.02, 0.18, rand(float2(segSeed, 0.654)));
+                            float inDash = step(xStart, uv.x) * step(uv.x, xStart + xLen);
+                            if (inDash > 0.0)
+                            {
+                                int subDashCount = 4 + (int)(rand(float2(segSeed, 0.999)) * 3); // 4-6 sub-dashes
+                                for (int sub = 0; sub < 8; sub++)
+                                {
+                                    if (sub >= subDashCount) break;
+                                    float subSeed = segSeed + sub * 7.77;
+                                    float subStart = xStart + rand(float2(subSeed, 0.111)) * (xLen - 0.01);
+                                    float subLen = lerp(0.005, 0.04, rand(float2(subSeed, 0.222)));
+                                    float inSubDash = step(subStart, uv.x) * step(uv.x, subStart + subLen);
+                                    float3 subColor = lerp(float3(1, 1, 0.95), float3(0.8, 0.9, 1.1), rand(float2(subSeed, 0.888)));
+                                    subColor = lerp(subColor, float3(1, 0.98, 0.8), rand(float2(subSeed, 0.444)) * 0.5);
+                                    float subBrightness = lerp(0.7, 1.2, rand(float2(subSeed, 0.333)));
+                                    float subFlicker = 0.8 + 0.2 * rand(float2(_TimeParam * 100.0, subSeed));
+                                    float subFinal = dashShape * inSubDash * subFlicker * _DashStreakIntensity * subBrightness;
+                                    col.rgb += subColor * subFinal;
+                                }
+                            }
+                        }
                     }
-                    dashSum = min(dashSum, 1.0);
-                    float dashFlicker = 0.8 + 0.2 * rand(float2(_TimeParam * 100.0, dashSeed));
-                    float dashFinal = dashShape * dashSum * dashFlicker * _DashStreakIntensity;
-                    col.rgb += float3(1, 1, 0.95) * dashFinal;
                 }
 
                 return col;
