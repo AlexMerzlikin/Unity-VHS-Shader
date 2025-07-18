@@ -64,14 +64,22 @@ Material:
     - _BumpScale: 1
     - _ColorBleed: 1.2
     - _Cutoff: 0.5
+    - _DashCount: 2
+    - _DashStreakCount: 1
+    - _DashStreakIntensity: 2
+    - _DashStreakWidth: 0
+    - _DashStreakWidthMax: 0.0063
+    - _DashStreakWidthMin: 0.0002
     - _DetailNormalMapScale: 1
     - _Distortion: 0.2
     - _DstBlend: 0
     - _EnableColorBleed: 1
     - _EnableColorGrading: 1
+    - _EnableDashes: 1
     - _EnableDistortion: 1
     - _EnableNoise: 1
     - _EnableScanlines: 1
+    - _EnableStreaks: 1
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
@@ -85,18 +93,21 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
-    - _StreakDistortion: 0.04
-    - _StreakIntensity: 0.397
-    - _StreakSpeed: 1.273
-    - _StreakWidth: 0.0037
-    - _TimeParam: 41.494286
+    - _StreakCount: 1
+    - _StreakDistortion: 0.2
+    - _StreakFullWidthChance: 0.098
+    - _StreakIntensity: 0
+    - _StreakSpeed: 0
+    - _StreakWidth: 0.043
+    - _TimeParam: 0.1734763
     - _UVSec: 0
-    - _WobbleFrequency: 49.4
-    - _WobbleSpeed: 4.13
+    - _WobbleFrequency: 30.1
+    - _WobbleIntensity: 1.66
+    - _WobbleSpeed: 4.98
     - _ZWrite: 1
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
-    - _StreakColor: {r: 1, g: 0.95, b: 0.7, a: 1}
+    - _StreakColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

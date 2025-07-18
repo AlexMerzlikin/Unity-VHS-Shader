@@ -26,6 +26,7 @@ Shader "Custom/VHSEffect"
         _EnableDashes ("Enable Dashes", Float) = 1
         _DashStreakWidthMin ("Dash Streak Width Min", Range(0,0.05)) = 0.004
         _DashStreakWidthMax ("Dash Streak Width Max", Range(0,0.05)) = 0.018
+        _WobbleIntensity ("Wobble Intensity", Range(0,5)) = 1
     }
     SubShader
     {
@@ -79,6 +80,7 @@ Shader "Custom/VHSEffect"
             float _EnableDashes;
             float _DashStreakWidthMin;
             float _DashStreakWidthMax;
+            float _WobbleIntensity;
 
             v2f vert(appdata v)
             {
@@ -96,7 +98,17 @@ Shader "Custom/VHSEffect"
             fixed4 frag(v2f i) : SV_Target
             {
                 float2 uv = i.uv;
-                fixed4 col = tex2D(_MainTex, uv);
+                // 5. Distortion/Wobble
+                float base = sin(uv.y * _WobbleFrequency + _TimeParam * _WobbleSpeed);
+                float spike = sign(sin(uv.y * (_WobbleFrequency * 3.7) + _TimeParam * (_WobbleSpeed * 2.2)));
+                float highFreq = abs(sin(uv.y * (_WobbleFrequency * 7.1) + _TimeParam * (_WobbleSpeed * 4.3))) * 2.0 - 1.0;
+                float noise = (rand(float2(uv.y * 40.0, _TimeParam * 4.0)) * 2.0 - 1.0);
+                float jump = step(0.5, frac(sin(uv.y * 100.0 + _TimeParam * 20.0) * 43758.5453)) * 2.0 - 1.0;
+                float abrupt = base * 0.2 + spike * 0.4 + highFreq * 0.2 + noise * 0.15 + jump * 0.25;
+                abrupt *= _WobbleIntensity;
+                float wobble = abrupt * _Distortion * 0.02;
+                float2 uvWobble = uv + float2(wobble, 0);
+                fixed4 col = tex2D(_MainTex, uvWobble);
 
                 // 1. Scanlines
                 float scanline = sin(uv.y * _ScanlineCount * 3.14159);
@@ -119,14 +131,8 @@ Shader "Custom/VHSEffect"
                 col.rgb = lerp(col.rgb, aberrated, blendAmount);
 
                 // 4. Noise/Static
-                float noise = (rand(uv * _TimeParam * 0.5 + _TimeParam) - 0.5) * _NoiseIntensity;
+                noise = (rand(uv * _TimeParam * 0.5 + _TimeParam) - 0.5) * _NoiseIntensity;
                 col.rgb += noise;
-
-                // 5. Distortion/Wobble
-                float wobble = sin(uv.y * _WobbleFrequency + _TimeParam * _WobbleSpeed) * _Distortion * 0.02;
-                float2 distortedUV = uv + float2(wobble, 0);
-                col.rgb = lerp(col.rgb, tex2D(_MainTex, distortedUV).rgb, _Distortion);
-                float frameSeed = floor(_TimeParam * 60.0);
 
                 // 6. Improved Horizontal Glitch Streaks (multiple, short, rare full-width)
                 if (_EnableStreaks > 0.5)
@@ -137,7 +143,7 @@ Shader "Custom/VHSEffect"
                     for (int s = 0; s < 8; s++)
                     {
                         if (s >= streaks) break;
-                        float streakSeed = frameSeed + s * 13.37;
+                        float streakSeed = floor(_TimeParam * 60.0) + s * 13.37;
                         float yPos = frac(rand(float2(streakSeed, streakSeed * 1.37))) * 0.8 + 0.1;
                         float xStart = rand(float2(streakSeed, 0.123)) * 0.8;
                         float xLen = lerp(0.08, 0.5, rand(float2(streakSeed, 0.456)));
@@ -167,7 +173,7 @@ Shader "Custom/VHSEffect"
                     for (int dStreak = 0; dStreak < 4; dStreak++)
                     {
                         if (dStreak >= (int)_DashStreakCount) break;
-                        float dashSeed = frameSeed + 100.0 + dStreak * 17.17;
+                        float dashSeed = floor(_TimeParam * 60.0) + 100.0 + dStreak * 17.17;
                         float dashY = frac(rand(float2(dashSeed, dashSeed * 1.37))) * 0.8 + 0.1;
                         float dashWidth = lerp(_DashStreakWidthMin, _DashStreakWidthMax, rand(float2(dashSeed, 0.555)));
                         float dashCore = step(abs(uv.y - dashY), dashWidth * 0.5);
