@@ -11,6 +11,17 @@ Shader "Custom/VHSEffect"
         _WobbleSpeed ("Wobble Speed", Range(0,20)) = 1
         _TimeParam ("Time", Float) = 0
         _ScanlineCount ("Scanline Count", Float) = 300.0
+        _StreakIntensity ("Streak Intensity", Range(0,2)) = 0.7
+        _StreakWidth ("Streak Width", Range(0,0.2)) = 0.02
+        _StreakSpeed ("Streak Speed", Range(0,2)) = 0.2
+        _StreakColor ("Streak Color", Color) = (1,0.95,0.7,1)
+        _StreakDistortion ("Streak Distortion", Range(0,0.2)) = 0.04
+        _StreakCount ("Streak Count", Range(1,8)) = 4
+        _StreakFullWidthChance ("Full Width Chance", Range(0,1)) = 0.08
+        _DashStreakIntensity ("Dash Streak Intensity", Range(0,2)) = 1.0
+        _DashStreakWidth ("Dash Streak Width", Range(0,0.05)) = 0.008
+        _DashStreakCount ("Dash Streak Count", Range(1,8)) = 1
+        _DashCount ("Dash Count", Range(2,12)) = 7
     }
     SubShader
     {
@@ -49,6 +60,17 @@ Shader "Custom/VHSEffect"
             float _WobbleSpeed;
             float _TimeParam;
             float _ScanlineCount;
+            float _StreakIntensity;
+            float _StreakWidth;
+            float _StreakSpeed;
+            float4 _StreakColor;
+            float _StreakDistortion;
+            float _StreakCount;
+            float _StreakFullWidthChance;
+            float _DashStreakIntensity;
+            float _DashStreakWidth;
+            float _DashStreakCount;
+            float _DashCount;
 
             v2f vert(appdata v)
             {
@@ -58,7 +80,6 @@ Shader "Custom/VHSEffect"
                 return o;
             }
 
-            // Helper: Simple random noise
             float rand(float2 co)
             {
                 return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453);
@@ -97,6 +118,63 @@ Shader "Custom/VHSEffect"
                 float wobble = sin(uv.y * _WobbleFrequency + _TimeParam * _WobbleSpeed) * _Distortion * 0.02;
                 float2 distortedUV = uv + float2(wobble, 0);
                 col.rgb = lerp(col.rgb, tex2D(_MainTex, distortedUV).rgb, _Distortion);
+
+                // 6. Improved Horizontal Glitch Streaks (multiple, short, rare full-width)
+                float3 streakColorSum = float3(0, 0, 0);
+                float streakShapeSum = 0.0;
+                int streaks = (int)_StreakCount;
+                float frameSeed = floor(_TimeParam * 60.0);
+                for (int s = 0; s < 8; s++)
+                {
+                    if (s >= streaks) break;
+                    float streakSeed = frameSeed + s * 13.37;
+                    float yPos = frac(rand(float2(streakSeed, streakSeed * 1.37))) * 0.8 + 0.1;
+                    float xStart = rand(float2(streakSeed, 0.123)) * 0.8;
+                    float xLen = lerp(0.08, 0.5, rand(float2(streakSeed, 0.456)));
+                    float fullWidth = step(1.0 - _StreakFullWidthChance, rand(float2(streakSeed, 0.789)));
+                    xStart = lerp(xStart, 0.0, fullWidth);
+                    xLen = lerp(xLen, 1.0, fullWidth);
+                    float inX = step(xStart, uv.x) * step(uv.x, xStart + xLen);
+                    float streakCore = step(abs(uv.y - yPos), _StreakWidth * 0.3);
+                    float streakEdge = smoothstep(_StreakWidth, 0.0, abs(uv.y - yPos));
+                    float streakShape = max(streakCore, streakEdge * 0.7) * inX;
+                    float flicker = lerp(0.7, 1.0, rand(float2(_TimeParam * 10.0, streakSeed))) * (0.7 + 0.3 * sin(
+                        _TimeParam * 360.0 + streakSeed * 10.0));
+                    float streak = streakShape * flicker * _StreakIntensity;
+                    float3 thisStreakColor = _StreakColor.rgb * streak;
+                    streakColorSum += thisStreakColor;
+                    streakShapeSum = max(streakShapeSum, streakShape);
+                }
+
+                float streakDistort = streakShapeSum * _StreakDistortion * (rand(float2(uv.y, _TimeParam)) - 0.5);
+                float2 uvStreaked = uv + float2(streakDistort, 0);
+                col.rgb = lerp(col.rgb, tex2D(_MainTex, uvStreaked).rgb, streakShapeSum * 0.5);
+                col.rgb += streakColorSum;
+
+                // 7. Segmented/Dashed Horizontal Streak (VHS dropout)
+                for (int dStreak = 0; dStreak < 4; dStreak++)
+                {
+                    if (dStreak >= (int)_DashStreakCount) break;
+                    float dashSeed = frameSeed + 100.0 + dStreak * 17.17;
+                    float dashY = frac(rand(float2(dashSeed, dashSeed * 1.37))) * 0.8 + 0.1;
+                    float dashCore = step(abs(uv.y - dashY), _DashStreakWidth * 0.5);
+                    float dashEdge = smoothstep(_DashStreakWidth, 0.0, abs(uv.y - dashY));
+                    float dashShape = max(dashCore, dashEdge * 0.7);
+                    float dashSum = 0.0;
+                    for (int seg = 0; seg < 12; seg++)
+                    {
+                        if (seg >= (int)_DashCount) break;
+                        float segSeed = dashSeed + seg * 23.23;
+                        float xStart = rand(float2(segSeed, 0.321));
+                        float xLen = lerp(0.02, 0.18, rand(float2(segSeed, 0.654)));
+                        float inDash = step(xStart, uv.x) * step(uv.x, xStart + xLen);
+                        dashSum += inDash;
+                    }
+                    dashSum = min(dashSum, 1.0);
+                    float dashFlicker = 0.8 + 0.2 * rand(float2(_TimeParam * 100.0, dashSeed));
+                    float dashFinal = dashShape * dashSum * dashFlicker * _DashStreakIntensity;
+                    col.rgb += float3(1, 1, 0.95) * dashFinal;
+                }
 
                 return col;
             }
