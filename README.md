@@ -17,18 +17,7 @@ https://github.com/user-attachments/assets/dcb8cb12-ca31-49be-b1ba-47d32e8e15a1
 ## Quick Start
 1. Grab the setup for Quad and Canvas/Image from TvSetupScene.unity
 
-Or
-
-1. **Import the VHS Shader**
-   - Copy the `Assets/VHS/` folder to your Unity project
-   - The shader will be available as `Custom/VHSEffect`
-
-2. **Apply to Camera**
-   - Add the `VhsPostProcess` script to your main camera
-   - Assign the `VHSMaterial` to the script's material field
-   - The effect will be applied to the entire screen
-
-3. **Customize the Effect**
+2. Customize the Effect
    - Select the `VHSMaterial` in the Project window
    - Adjust parameters in the Inspector to achieve your desired look
 
